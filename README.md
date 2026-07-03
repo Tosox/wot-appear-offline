@@ -93,62 +93,32 @@ Restart the client after editing the file (same "applies on next login" rule).
 ## Build (for developers)
 
 Two artifacts are produced: the Python mod (`.pyc`) and the native UI (`.swf`).
-The compiled SWF is committed, so you only need to rebuild it if you change the
-AS3.
+The pre-built SWF lives in `build/`, so you only need to rebuild it if you change
+the ActionScript. **All generated files land in `build/` (and `dist/`) — nothing
+generated ever sits next to source.**
 
 **1. Mod + package** — requires **Python 2.7** (compiles the game bytecode) and
 **Python 3** (runs the script). Paths are configured at the top of `build.py`.
 
 ```bash
 python build.py            # -> dist/de.tosox.appear_offline_1.0.0.wotmod
-python build.py --dev      # also drops the .pyc + .swf into res_mods (fast test loop)
 python build.py --install  # also copies the .wotmod into mods/<version>
 ```
 
-`build.py` packages the pre-built `as3/appear_offline_contacts_hook.swf`; it does
-not compile it.
+`build.py` compiles `src/` into `build/py_stage/` and maps it into the game's
+`res/` tree: the thin entry module goes to `scripts/client/gui/mods/`, the
+`appear_offline` package to `scripts/client/`, and the SWF (read from `build/`)
+to `gui/flash/`. `meta.xml` is rendered from `meta.xml.in`. It does **not**
+compile the SWF.
 
-> When switching from `--dev` testing to a real `.wotmod` install, remove the
-> dev copies from `res_mods/2.3.0.1/scripts/client/gui/mods/` and
-> `res_mods/2.3.0.1/gui/flash/` so the mod isn't loaded twice.
-
-**2. UI SWF** (only if you touched the AS3) — requires the **Apache Flex SDK**
-(+ playerglobal) at `.work/tools/flex` (or set `FLEX_HOME`):
+**2. UI SWF** (only if you touched the ActionScript) — requires the **Apache Flex
+SDK** (+ playerglobal) at `.work/tools/flex` (or set `FLEX_HOME`):
 
 ```bash
-bash as3/build_swf.sh      # -> as3/appear_offline_contacts_hook.swf
+bash src_flash/build_swf.sh   # -> build/appear_offline_contacts_hook.swf
 ```
 
-It compiles minimal external signature stubs (`as3/stubs`) into a `.swc`, then
-builds the hook with `mxmlc` at `-swf-version=17` (the game's SWFs are v17; GFx
-rejects newer). The game's real `net.wg.*` classes are used at runtime and are
-not embedded.
-
-## Testing
-
-There is no hot reload — recompile and restart the client for every change.
-Watch `python.log` at the game root for the mod's output:
-
-```
-[appear_offline] config loaded: {...}
-[appear_offline] presence patch armed (your setting applies at each login)
-[appear_offline] UI hook registered
-[appear_offline] loaded
-[appear_offline] reconfigured: enabled=... see_others=... (applies on next login)
-```
-
-To confirm end-to-end, use a **second account** (or ask a friend): appear offline
-on account A and verify account B sees you offline while you can still play — and,
-in Invisible mode, that A still sees B's status changes.
-
-## Project layout
-
-```
-src/mod_appear_offline.py          the mod (Python 2.7)
-as3/src/                           AS3 sources for the UI hook SWF
-as3/stubs/                         minimal net.wg.* signature stubs (compiled to a .swc)
-as3/build_swf.sh                   mxmlc build for the SWF
-as3/appear_offline_contacts_hook.swf   compiled UI hook (committed)
-build.py                           compile + package + install helper (Python 3)
-dist/                              built .wotmod output
-```
+It compiles minimal external signature stubs (`src_flash/stubs`) into a `.swc`,
+then builds the hook with `mxmlc` at `-swf-version=17` (the game's SWFs are v17;
+GFx rejects newer). The game's real `net.wg.*` classes are used at runtime and
+are not embedded.

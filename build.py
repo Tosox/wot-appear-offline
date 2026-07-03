@@ -4,11 +4,15 @@
 Run with your normal Python 3:
 
     python build.py            # compile + produce dist/<id>_<ver>.wotmod
-    python build.py --dev      # also drop the .pyc into the game's res_mods (fast test loop)
     python build.py --install  # also copy the .wotmod into the game's mods/<version> folder
 
-The mod source is compiled to .pyc with Python 2.7 (required by the game),
-everything else is plain zipping done here in Python 3.
+Layout: Python sources live in src/ (a thin entry module + the appear_offline
+package); the compiled UI SWF is produced separately by src_flash/build_swf.sh
+into build/. This script compiles the Python to .pyc with Python 2.7 (required
+by the game), then zips everything into the res/ tree the game expects.
+
+Nothing generated is ever written next to source: .pyc are compiled inside
+build/py_stage/, and the .swf is read from build/.
 """
 import argparse
 import os
@@ -28,61 +32,70 @@ GAME_DIR = r'C:\Games\World_of_Tanks_EU'
 GAME_VERSION = '2.3.0.1'  # res_mods/<version> and mods/<version> folder name
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SRC = os.path.join(HERE, 'src', 'mod_appear_offline.py')
-PYC = os.path.join(HERE, 'src', 'mod_appear_offline.pyc')
+SRC = os.path.join(HERE, 'src')
+BUILD = os.path.join(HERE, 'build')
+PY_STAGE = os.path.join(BUILD, 'py_stage')
 DIST = os.path.join(HERE, 'dist')
-PYC_REL = 'scripts/client/gui/mods/mod_appear_offline.pyc'
-SWF = os.path.join(HERE, 'as3', 'appear_offline_contacts_hook.swf')
+META_IN = os.path.join(HERE, 'meta.xml.in')
+SWF = os.path.join(BUILD, 'appear_offline_contacts_hook.swf')
+
+# Where sources map inside the game's res/ tree.
+#   entry module   -> scripts/client/gui/mods/  (auto-loaded by WoT)
+#   appear_offline -> scripts/client/           (top-level importable library)
+#   UI hook SWF    -> gui/flash/
+ENTRY_RES_DIR = 'scripts/client/gui/mods'
+PKG_RES_DIR = 'scripts/client/appear_offline'
 SWF_REL = 'gui/flash/appear_offline_contacts_hook.swf'
 
 
 def compile_pyc():
+    """Compile every .py in src/ to .pyc inside build/py_stage (never in src/)."""
     if not os.path.exists(PYTHON27):
         sys.exit('Python 2.7 not found at %s - edit PYTHON27 in build.py' % PYTHON27)
-    if os.path.exists(PYC):
-        os.remove(PYC)
-    # -m py_compile writes mod_appear_offline.pyc next to the source.
-    subprocess.check_call([PYTHON27, '-m', 'py_compile', SRC])
-    if not os.path.exists(PYC):
-        sys.exit('Compilation failed: %s not produced' % PYC)
-    print('compiled -> %s' % PYC)
+    if os.path.exists(PY_STAGE):
+        shutil.rmtree(PY_STAGE)
+    shutil.copytree(SRC, PY_STAGE,
+                    ignore=shutil.ignore_patterns('*.pyc', '__pycache__'))
+    subprocess.check_call([PYTHON27, '-m', 'compileall', '-q', PY_STAGE])
+    print('compiled -> %s' % PY_STAGE)
+
+
+def iter_payload():
+    """Yield (abs_source_path, res_relative_path) for every file that goes into
+    the mod: the entry .pyc, each package .pyc, and the UI SWF."""
+    entry = os.path.join(PY_STAGE, 'mod_appear_offline.pyc')
+    if not os.path.exists(entry):
+        sys.exit('missing %s - compile step failed' % entry)
+    yield entry, ENTRY_RES_DIR + '/mod_appear_offline.pyc'
+
+    pkg = os.path.join(PY_STAGE, 'appear_offline')
+    for name in sorted(os.listdir(pkg)):
+        if name.endswith('.pyc'):
+            yield os.path.join(pkg, name), PKG_RES_DIR + '/' + name
+
+    if os.path.exists(SWF):
+        yield SWF, SWF_REL
+    else:
+        print('WARNING: %s missing - UI hook not packaged (run src_flash/build_swf.sh)' % SWF)
+
+
+def render_meta():
+    with open(META_IN, 'r') as f:
+        template = f.read()
+    return template.format(id=MOD_ID, version=VERSION,
+                           name=MOD_NAME, description=MOD_DESCRIPTION)
 
 
 def build_wotmod():
     os.makedirs(DIST, exist_ok=True)
     out = os.path.join(DIST, '%s_%s.wotmod' % (MOD_ID, VERSION))
-    meta = (
-        '<root>\n'
-        '    <id>%s</id>\n'
-        '    <version>%s</version>\n'
-        '    <name>%s</name>\n'
-        '    <description>%s</description>\n'
-        '</root>' % (MOD_ID, VERSION, MOD_NAME, MOD_DESCRIPTION)
-    )
     # .wotmod must be a STORED (uncompressed) zip.
     with zipfile.ZipFile(out, 'w', zipfile.ZIP_STORED) as z:
-        z.writestr('meta.xml', meta)
-        z.write(PYC, 'res/' + PYC_REL)
-        if os.path.exists(SWF):
-            z.write(SWF, 'res/' + SWF_REL)
-        else:
-            print('WARNING: %s missing - UI hook not packaged' % SWF)
+        z.writestr('meta.xml', render_meta())
+        for src_path, res_rel in iter_payload():
+            z.write(src_path, 'res/' + res_rel)
     print('packaged -> %s' % out)
     return out
-
-
-def dev_install():
-    dst = os.path.join(GAME_DIR, 'res_mods', GAME_VERSION, *PYC_REL.split('/'))
-    os.makedirs(os.path.dirname(dst), exist_ok=True)
-    shutil.copyfile(PYC, dst)
-    print('dev-installed -> %s' % dst)
-    if os.path.exists(SWF):
-        swf_dst = os.path.join(GAME_DIR, 'res_mods', GAME_VERSION, *SWF_REL.split('/'))
-        os.makedirs(os.path.dirname(swf_dst), exist_ok=True)
-        shutil.copyfile(SWF, swf_dst)
-        print('dev-installed -> %s' % swf_dst)
-    else:
-        print('WARNING: %s missing - UI hook not dev-installed' % SWF)
 
 
 def install_wotmod(wotmod_path):
@@ -95,16 +108,12 @@ def install_wotmod(wotmod_path):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--dev', action='store_true',
-                    help="copy the .pyc into the game's res_mods for a quick test")
     ap.add_argument('--install', action='store_true',
                     help="copy the built .wotmod into the game's mods/<version> folder")
     args = ap.parse_args()
 
     compile_pyc()
     wotmod = build_wotmod()
-    if args.dev:
-        dev_install()
     if args.install:
         install_wotmod(wotmod)
     print('done.')
