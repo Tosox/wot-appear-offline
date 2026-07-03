@@ -24,12 +24,25 @@ _hook_view = None   # live instance of our loaded hook View (to call into its SW
 _cs_orig_populate = None
 
 
+def _format_notify_text():
+    """Compose the notification the game's native way: an alert icon (matching
+    the checkbox's warning icon) + a bold title line + a subtle grey body line.
+    Falls back to plain text if the formatters can't be imported."""
+    title = translations.label('notify_title')
+    body = translations.label('notify_body')
+    try:
+        from gui.shared.formatters import text_styles
+        return (text_styles.middleTitle(title) + '\n' + text_styles.main(body))
+    except Exception:
+        return title + ': ' + body
+
+
 def notify_apply_on_login():
     """Tell the user the change takes effect on next login (mid-session changing
     of chat presence is not reliable on WG's server)."""
     try:
         import gui.SystemMessages as SystemMessages
-        SystemMessages.pushMessage(translations.label('notify'),
+        SystemMessages.pushMessage(_format_notify_text(),
                                    type=SystemMessages.SM_TYPE.Warning)
     except Exception as e:
         log('notify failed: ' + str(e))
