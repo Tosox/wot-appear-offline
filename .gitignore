@@ -1,0 +1,5 @@
+.work/
+dist/
+as3/appear_offline_contacts_hook.swf
+as3/wgstub.swc
+*.pyc
