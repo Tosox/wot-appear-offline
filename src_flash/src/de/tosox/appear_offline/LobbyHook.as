@@ -1,8 +1,5 @@
 package de.tosox.appear_offline
 {
-   // Injects the Appear Offline options into the native Contacts > Settings view
-   // (alias "ContactsSettingsView"). Compiled with mxmlc against minimal stubs
-   // (see as3/stubs); net.wg.* classes are provided by the game at runtime.
    import flash.display.MovieClip;
    import flash.display.DisplayObjectContainer;
 
@@ -16,7 +13,6 @@ package de.tosox.appear_offline
    {
       public static const CONTACTS_SETTINGS_ALIAS:String = "ContactsSettingsView";
 
-      // Bound by the DAAPI bridge to the same-named methods on the Python view.
       public var getAppearOfflineSettings:Function;
       public var setAppearOfflineSettings:Function;
 
@@ -47,7 +43,6 @@ package de.tosox.appear_offline
          App.containerMgr.loader.addEventListener(LoaderEvent.VIEW_LOADED, onViewLoaded, false, 0, true);
       }
 
-      // Re-parent to App root so focus/position stay valid (esp. login window).
       override protected function nextFrameAfterPopulateHandler() : void
       {
          super.nextFrameAfterPopulateHandler();
@@ -57,9 +52,6 @@ package de.tosox.appear_offline
          }
       }
 
-      // Called from Python when the Contacts settings view opens. That view is a
-      // sub-view that doesn't fire VIEW_LOADED on the main loader, so we locate
-      // it in the display tree by its native 'cbIsShowOthers' checkbox.
       public function injectContacts() : void
       {
          _searchTries = 0;

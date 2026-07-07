@@ -1,15 +1,4 @@
 #!/usr/bin/env bash
-# Builds appear_offline_contacts_hook.swf from our AS3 sources using mxmlc.
-#
-# Approach: compile against minimal *external* signature stubs (src_flash/stubs)
-# so the game's real net.wg classes are used at runtime and are NOT embedded.
-# The output is a bare Scaleform view SWF (document class = AppearOfflineHookUI,
-# the alias the Python side registers), forced to SWF version 17 to match the
-# game's own SWFs (GFx rejects newer versions).
-#
-# Artifacts (the .swc and the .swf) are written to ../build/, never next to the
-# sources. Requires: Apache Flex SDK + playerglobal (see repo README /
-# .work/tools/flex).
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -17,8 +6,6 @@ BUILD="../build"
 mkdir -p "$BUILD"
 BUILD="$(cd "$BUILD" && pwd)"
 
-# Absolute path required: the SDK resolves {playerglobalHome} against its own
-# config dir, not the CWD, so a relative path fails.
 FLEX="$(cd "${FLEX_HOME:-../.work/tools/flex}" && pwd)"
 export PLAYERGLOBAL_HOME="$FLEX/frameworks/libs/player"
 

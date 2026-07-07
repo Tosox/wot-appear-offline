@@ -1,19 +1,3 @@
-#!/usr/bin/env python3
-"""Build / install helper for the Appear Offline WoT mod.
-
-Run with your normal Python 3:
-
-    python build.py            # compile + produce dist/<id>_<ver>.wotmod
-    python build.py --install  # also copy the .wotmod into the game's mods/<version> folder
-
-Layout: Python sources live in src/ (a thin entry module + the appear_offline
-package); the compiled UI SWF is produced separately by src_flash/build_swf.sh
-into build/. This script compiles the Python to .pyc with Python 2.7 (required
-by the game), then zips everything into the res/ tree the game expects.
-
-Nothing generated is ever written next to source: .pyc are compiled inside
-build/py_stage/, and the .swf is read from build/.
-"""
 import argparse
 import os
 import shutil
@@ -21,15 +5,14 @@ import subprocess
 import sys
 import zipfile
 
-# --- Configuration -----------------------------------------------------------
 MOD_ID = 'de.tosox.appear_offline'
 VERSION = '1.0.0'
 MOD_NAME = 'Appear Offline'
 MOD_DESCRIPTION = 'Appear offline to friends and clanmates while you keep playing'
 
-PYTHON27 = r'C:\Python27\python.exe'
-GAME_DIR = r'C:\Games\World_of_Tanks_EU'
-GAME_VERSION = '2.3.0.1'  # res_mods/<version> and mods/<version> folder name
+PYTHON27 = 'C:\\Python27\\python.exe'
+GAME_DIR = 'C:\\Games\\World_of_Tanks_EU'
+GAME_VERSION = '2.3.0.1'
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(HERE, 'src')
@@ -39,17 +22,12 @@ DIST = os.path.join(HERE, 'dist')
 META_IN = os.path.join(HERE, 'meta.xml.in')
 SWF = os.path.join(BUILD, 'appear_offline_contacts_hook.swf')
 
-# Where sources map inside the game's res/ tree.
-#   entry module   -> scripts/client/gui/mods/  (auto-loaded by WoT)
-#   appear_offline -> scripts/client/           (top-level importable library)
-#   UI hook SWF    -> gui/flash/
 ENTRY_RES_DIR = 'scripts/client/gui/mods'
 PKG_RES_DIR = 'scripts/client/appear_offline'
 SWF_REL = 'gui/flash/appear_offline_contacts_hook.swf'
 
 
 def compile_pyc():
-    """Compile every .py in src/ to .pyc inside build/py_stage (never in src/)."""
     if not os.path.exists(PYTHON27):
         sys.exit('Python 2.7 not found at %s - edit PYTHON27 in build.py' % PYTHON27)
     if os.path.exists(PY_STAGE):
@@ -61,8 +39,6 @@ def compile_pyc():
 
 
 def iter_payload():
-    """Yield (abs_source_path, res_relative_path) for every file that goes into
-    the mod: the entry .pyc, each package .pyc, and the UI SWF."""
     entry = os.path.join(PY_STAGE, 'mod_appear_offline.pyc')
     if not os.path.exists(entry):
         sys.exit('missing %s - compile step failed' % entry)
@@ -89,7 +65,6 @@ def render_meta():
 def build_wotmod():
     os.makedirs(DIST, exist_ok=True)
     out = os.path.join(DIST, '%s_%s.wotmod' % (MOD_ID, VERSION))
-    # .wotmod must be a STORED (uncompressed) zip.
     with zipfile.ZipFile(out, 'w', zipfile.ZIP_STORED) as z:
         z.writestr('meta.xml', render_meta())
         for src_path, res_rel in iter_payload():

@@ -1,10 +1,5 @@
 package de.tosox.appear_offline
 {
-   // Injects the two Appear Offline checkboxes into the native Contacts >
-   // Settings view, using the game's own CLIK CheckBox (no custom artwork).
-   // They sit in their own section below the native Apply/Cancel bar, separated
-   // by a divider line. Toggling calls back to Python (which saves + notifies;
-   // the change takes effect on next login).
    import flash.display.DisplayObject;
    import flash.display.DisplayObjectContainer;
    import flash.display.Sprite;
@@ -42,7 +37,6 @@ package de.tosox.appear_offline
          {
             return;
          }
-         // Guard against double injection (view stays alive across tab switches).
          if(this._view.getChildByName(ENABLED_CB_NAME) != null)
          {
             return;
@@ -51,7 +45,6 @@ package de.tosox.appear_offline
          var anchor:DisplayObject = this._view.getChildByName("cbIsShowOthers");
          var baseX:Number = anchor != null ? anchor.x : 20;
 
-         // Match the native row spacing (distance between the two native rows).
          var cbOffline:DisplayObject = this._view.getChildByName("cbIsShowOfflineUsers");
          var rowGap:Number = (anchor != null && cbOffline != null) ? (anchor.y - cbOffline.y) : 30;
          if(rowGap < 20)
@@ -59,8 +52,6 @@ package de.tosox.appear_offline
             rowGap = 30;
          }
 
-         // Our section goes below the native Apply/Cancel bar, anchored to the OK
-         // button's bottom (btns.height reports a large padded box).
          var sectionTop:Number = (anchor != null ? anchor.y + rowGap * 2 : 120);
          var panelW:Number = this._view.width;
          try
@@ -78,7 +69,6 @@ package de.tosox.appear_offline
          var sepY:Number = sectionTop + 10;
          var firstY:Number = sepY + 14;
 
-         // Divider line above our section.
          var sep:Sprite = new Sprite();
          sep.name = SEP_NAME;
          var sepW:Number = (panelW > baseX * 2 + 40) ? (panelW - baseX * 2) : 250;
@@ -109,14 +99,9 @@ package de.tosox.appear_offline
          this._cbEnabled.addEventListener(Event.SELECT, this.onChanged);
          this._cbSeeOthers.addEventListener(Event.SELECT, this.onChanged);
 
-         // Add to the view BEFORE the info icon: CheckBox.createInfoIco() derives
-         // its 'owner' from parent, so it NPEs if validated without a parent.
          this._view.addChild(this._cbEnabled);
          this._view.addChild(this._cbSeeOthers);
 
-         // Warning icon + tooltip next to the "see others" label (like the native
-         // Reticle > Armor Flashlight "Performance Warning"). "warning" is
-         // InfoIcon.TYPE_WARNING; the literal avoids a class reference.
          try
          {
             if(this._settings.seeOthersTooltip != null && String(this._settings.seeOthersTooltip).length > 0)
@@ -132,7 +117,6 @@ package de.tosox.appear_offline
          this._cbEnabled.validateNow();
          this._cbSeeOthers.validateNow();
 
-         // Grow the panel so our section fits under the button bar.
          try
          {
             var contentBottom:Number = firstY + rowGap + 18;
