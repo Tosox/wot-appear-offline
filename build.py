@@ -27,6 +27,8 @@ META_TEMPLATE = (
     '    <version>{version}</version>\n'
     '    <name>{name}</name>\n'
     '    <description>{description}</description>\n'
+    '    <author>{author}</author>\n'
+    '    <website>{website}</website>\n'
     '</root>\n'
 )
 
@@ -107,8 +109,8 @@ def build_wotmod(mod, entry, package):
     if not os.path.isdir(DIST):
         os.makedirs(DIST)
     out = os.path.join(DIST, '%s_%s.wotmod' % (mod['id'], mod['version']))
-    meta = META_TEMPLATE.format(id=mod['id'], version=mod['version'],
-                                name=mod['name'], description=mod['description'])
+    meta = META_TEMPLATE.format(id=mod['id'], version=mod['version'], name=mod['name'],
+                                description=mod['description'], author=mod['author'], website=mod['website'])
     with zipfile.ZipFile(out, 'w', zipfile.ZIP_STORED) as z:
         z.writestr('meta.xml', meta)
         for src_path, archive_path in iter_payload(entry, package, mod['extra_files']):

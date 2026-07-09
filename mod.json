@@ -3,6 +3,8 @@
     "version": "1.0.0",
     "name": "Appear Offline",
     "description": "Appear offline to friends and clanmates while you keep playing",
+    "author": "Tosox",
+    "website": "https://github.com/Tosox/wot-appear-offline",
     "prebuild": [
         ["python", "src_flash/build_swf.py"]
     ],
