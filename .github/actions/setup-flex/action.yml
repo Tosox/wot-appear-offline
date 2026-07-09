@@ -1,0 +1,44 @@
+name: Setup Apache Flex SDK
+description: Install Apache Flex SDK + Adobe playerglobal.swc and export FLEX_HOME.
+
+inputs:
+  flex-version:
+    description: Apache Flex SDK version
+    default: '4.16.1'
+  player-version:
+    description: Flash Player version folder for playerglobal.swc
+    default: '11.1'
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Java 11
+      uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: '11'
+
+    - name: Cache Flex SDK
+      id: cache
+      uses: actions/cache@v4
+      with:
+        path: ${{ runner.temp }}/flex
+        key: flex-${{ inputs.flex-version }}-player-${{ inputs.player-version }}
+
+    - name: Download Flex SDK + playerglobal
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        flex="${{ runner.temp }}/flex"
+        mkdir -p "$flex"
+        curl -fsSL "https://archive.apache.org/dist/flex/${{ inputs.flex-version }}/binaries/apache-flex-sdk-${{ inputs.flex-version }}-bin.tar.gz" \
+          | tar -xz -C "$flex" --strip-components=1
+        pg="$flex/frameworks/libs/player/${{ inputs.player-version }}"
+        mkdir -p "$pg"
+        curl -fsSL -o "$pg/playerglobal.swc" \
+          "https://fpdownload.macromedia.com/get/flashplayer/updaters/32/playerglobal32_0.swc"
+
+    - name: Export FLEX_HOME
+      shell: bash
+      run: echo "FLEX_HOME=${{ runner.temp }}/flex" >> "$GITHUB_ENV"
