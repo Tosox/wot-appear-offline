@@ -12,15 +12,19 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
       - name: Setup Python 2.7
-        uses: actions/setup-python@v5
-        with:
-          python-version: '2.7'
+        run: |
+          cat > "$RUNNER_TEMP/python27" <<'SH'
+          #!/usr/bin/env bash
+          exec docker run --rm -v "$PWD":"$PWD" -w "$PWD" -u "$(id -u):$(id -g)" python:2.7-slim python "$@"
+          SH
+          chmod +x "$RUNNER_TEMP/python27"
+          echo "PYTHON27=$RUNNER_TEMP/python27" >> "$GITHUB_ENV"
 
       - name: Setup Apache Flex SDK
         uses: ./.github/actions/setup-flex
