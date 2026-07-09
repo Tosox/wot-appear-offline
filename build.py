@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Tosox
+
 from __future__ import print_function
 
 import argparse
