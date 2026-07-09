@@ -1,10 +1,3 @@
-# -*- coding: utf-8 -*-
-"""Config load/save for the Appear Offline mod.
-
-`settings` is the single live config dict; presence.py and ui.py read it
-directly. It is mutated in place (never rebound), so importing the module and
-using `config.settings` always sees current values.
-"""
 import os
 import json
 
@@ -13,14 +6,10 @@ from appear_offline.log import log
 _CONFIG_PATH = 'mods/configs/appear_offline/config.json'
 
 _DEFAULT_CONFIG = {
-    # Master switch. Set to false to disable the mod without uninstalling it.
     'enabled': True,
-    # true  -> invisible (appear offline but still see others' status)
-    # false -> hard offline (appear offline, also stop seeing others)
     'see_others_status': False,
 }
 
-# Live config. Read directly as config.settings elsewhere.
 settings = dict(_DEFAULT_CONFIG)
 
 

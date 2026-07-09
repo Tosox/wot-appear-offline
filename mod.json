@@ -1,0 +1,23 @@
+{
+    "id": "de.tosox.appear_offline",
+    "version": "1.0.0",
+    "name": "Appear Offline",
+    "description": "Appear offline to friends and clanmates while you keep playing",
+    "author": "Tosox",
+    "website": "https://github.com/Tosox/wot-appear-offline",
+    "prebuild": [
+        ["python", "src_flash/build_swf.py"]
+    ],
+    "flash": {
+        "main": "src_flash/src/AppearOfflineHookUI.as",
+        "stubs": "src_flash/stubs",
+        "output": "build/appear_offline_contacts_hook.swf",
+        "stub_swc": "build/wgstub.swc"
+    },
+    "extra_files": [
+        { "src": "build/appear_offline_contacts_hook.swf", "dst": "res/gui/flash/appear_offline_contacts_hook.swf" },
+        { "src": "README.md", "dst": "README.md" },
+        { "src": "CHANGELOG.md", "dst": "CHANGELOG.md" },
+        { "src": "LICENSE", "dst": "LICENSE" }
+    ]
+}

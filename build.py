@@ -1,121 +1,151 @@
-#!/usr/bin/env python3
-"""Build / install helper for the Appear Offline WoT mod.
+# Copyright (c) 2026 Tosox
 
-Run with your normal Python 3:
+from __future__ import print_function
 
-    python build.py            # compile + produce dist/<id>_<ver>.wotmod
-    python build.py --install  # also copy the .wotmod into the game's mods/<version> folder
-
-Layout: Python sources live in src/ (a thin entry module + the appear_offline
-package); the compiled UI SWF is produced separately by src_flash/build_swf.sh
-into build/. This script compiles the Python to .pyc with Python 2.7 (required
-by the game), then zips everything into the res/ tree the game expects.
-
-Nothing generated is ever written next to source: .pyc are compiled inside
-build/py_stage/, and the .swf is read from build/.
-"""
 import argparse
+import json
 import os
 import shutil
 import subprocess
 import sys
 import zipfile
 
-# --- Configuration -----------------------------------------------------------
-MOD_ID = 'de.tosox.appear_offline'
-VERSION = '1.0.0'
-MOD_NAME = 'Appear Offline'
-MOD_DESCRIPTION = 'Appear offline to friends and clanmates while you keep playing'
-
-PYTHON27 = r'C:\Python27\python.exe'
-GAME_DIR = r'C:\Games\World_of_Tanks_EU'
-GAME_VERSION = '2.3.0.1'  # res_mods/<version> and mods/<version> folder name
-
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(HERE, 'src')
 BUILD = os.path.join(HERE, 'build')
 PY_STAGE = os.path.join(BUILD, 'py_stage')
 DIST = os.path.join(HERE, 'dist')
-META_IN = os.path.join(HERE, 'meta.xml.in')
-SWF = os.path.join(BUILD, 'appear_offline_contacts_hook.swf')
+MOD_JSON = os.path.join(HERE, 'mod.json')
+LOCAL_JSON = os.path.join(HERE, 'build.local.json')
 
-# Where sources map inside the game's res/ tree.
-#   entry module   -> scripts/client/gui/mods/  (auto-loaded by WoT)
-#   appear_offline -> scripts/client/           (top-level importable library)
-#   UI hook SWF    -> gui/flash/
 ENTRY_RES_DIR = 'scripts/client/gui/mods'
-PKG_RES_DIR = 'scripts/client/appear_offline'
-SWF_REL = 'gui/flash/appear_offline_contacts_hook.swf'
+PKG_RES_PARENT = 'scripts/client'
+
+META_TEMPLATE = (
+    '<root>\n'
+    '    <id>{id}</id>\n'
+    '    <version>{version}</version>\n'
+    '    <name>{name}</name>\n'
+    '    <description>{description}</description>\n'
+    '    <author>{author}</author>\n'
+    '    <website>{website}</website>\n'
+    '</root>\n'
+)
+
+
+def load_mod():
+    with open(MOD_JSON, 'r') as f:
+        mod = json.load(f)
+    mod.setdefault('prebuild', [])
+    mod.setdefault('extra_files', [])
+    return mod
+
+
+def load_local():
+    if os.path.exists(LOCAL_JSON):
+        with open(LOCAL_JSON, 'r') as f:
+            return json.load(f)
+    return {}
+
+
+def discover():
+    entries = [n[:-3] for n in os.listdir(SRC)
+               if n.startswith('mod_') and n.endswith('.py')]
+    packages = [n for n in os.listdir(SRC)
+                if os.path.isdir(os.path.join(SRC, n))]
+    if len(entries) != 1:
+        sys.exit('expected exactly one src/mod_*.py entry, found: %s' % entries)
+    if len(packages) != 1:
+        sys.exit('expected exactly one package dir under src/, found: %s' % packages)
+    return entries[0], packages[0]
+
+
+def find_python27():
+    if sys.version_info[:2] == (2, 7):
+        return sys.executable
+    python27 = os.environ.get('PYTHON27')
+    if not python27:
+        sys.exit('Python 2.7 not set: $PYTHON27 (path to python.exe)')
+    return python27
+
+
+def run_prebuild(prebuild):
+    for cmd in prebuild:
+        print('prebuild: %s' % ' '.join(cmd))
+        subprocess.check_call(cmd, cwd=HERE)
 
 
 def compile_pyc():
-    """Compile every .py in src/ to .pyc inside build/py_stage (never in src/)."""
-    if not os.path.exists(PYTHON27):
-        sys.exit('Python 2.7 not found at %s - edit PYTHON27 in build.py' % PYTHON27)
+    python27 = find_python27()
     if os.path.exists(PY_STAGE):
         shutil.rmtree(PY_STAGE)
     shutil.copytree(SRC, PY_STAGE,
                     ignore=shutil.ignore_patterns('*.pyc', '__pycache__'))
-    subprocess.check_call([PYTHON27, '-m', 'compileall', '-q', PY_STAGE])
+    subprocess.check_call([python27, '-m', 'compileall', '-q', PY_STAGE])
     print('compiled -> %s' % PY_STAGE)
 
 
-def iter_payload():
-    """Yield (abs_source_path, res_relative_path) for every file that goes into
-    the mod: the entry .pyc, each package .pyc, and the UI SWF."""
-    entry = os.path.join(PY_STAGE, 'mod_appear_offline.pyc')
-    if not os.path.exists(entry):
-        sys.exit('missing %s - compile step failed' % entry)
-    yield entry, ENTRY_RES_DIR + '/mod_appear_offline.pyc'
+def iter_payload(entry, package, extra_files):
+    entry_pyc = os.path.join(PY_STAGE, entry + '.pyc')
+    if not os.path.exists(entry_pyc):
+        sys.exit('missing %s - compile step failed' % entry_pyc)
+    yield entry_pyc, 'res/' + ENTRY_RES_DIR + '/' + entry + '.pyc'
 
-    pkg = os.path.join(PY_STAGE, 'appear_offline')
-    for name in sorted(os.listdir(pkg)):
+    pkg_dir = os.path.join(PY_STAGE, package)
+    for name in sorted(os.listdir(pkg_dir)):
         if name.endswith('.pyc'):
-            yield os.path.join(pkg, name), PKG_RES_DIR + '/' + name
+            yield (os.path.join(pkg_dir, name),
+                   'res/' + PKG_RES_PARENT + '/' + package + '/' + name)
 
-    if os.path.exists(SWF):
-        yield SWF, SWF_REL
-    else:
-        print('WARNING: %s missing - UI hook not packaged (run src_flash/build_swf.sh)' % SWF)
-
-
-def render_meta():
-    with open(META_IN, 'r') as f:
-        template = f.read()
-    return template.format(id=MOD_ID, version=VERSION,
-                           name=MOD_NAME, description=MOD_DESCRIPTION)
+    for item in extra_files:
+        src = os.path.join(HERE, item['src'])
+        if os.path.exists(src):
+            yield src, item['dst']
+        else:
+            print('WARNING: extra file missing, not packaged: %s' % item['src'])
 
 
-def build_wotmod():
-    os.makedirs(DIST, exist_ok=True)
-    out = os.path.join(DIST, '%s_%s.wotmod' % (MOD_ID, VERSION))
-    # .wotmod must be a STORED (uncompressed) zip.
+def build_wotmod(mod, entry, package):
+    if not os.path.isdir(DIST):
+        os.makedirs(DIST)
+    out = os.path.join(DIST, '%s_%s.wotmod' % (mod['id'], mod['version']))
+    meta = META_TEMPLATE.format(id=mod['id'], version=mod['version'], name=mod['name'],
+                                description=mod['description'], author=mod['author'], website=mod['website'])
     with zipfile.ZipFile(out, 'w', zipfile.ZIP_STORED) as z:
-        z.writestr('meta.xml', render_meta())
-        for src_path, res_rel in iter_payload():
-            z.write(src_path, 'res/' + res_rel)
+        z.writestr('meta.xml', meta)
+        for src_path, archive_path in iter_payload(entry, package, mod['extra_files']):
+            z.write(src_path, archive_path)
     print('packaged -> %s' % out)
     return out
 
 
-def install_wotmod(wotmod_path):
-    dst_dir = os.path.join(GAME_DIR, 'mods', GAME_VERSION)
-    os.makedirs(dst_dir, exist_ok=True)
+def install_wotmod(wotmod_path, local):
+    game_dir = local.get('game_dir')
+    game_version = local.get('game_version')
+    if not game_dir or not game_version:
+        sys.exit('install needs "game_dir" and "game_version" in build.local.json')
+    dst_dir = os.path.join(game_dir, 'mods', game_version)
+    if not os.path.isdir(dst_dir):
+        os.makedirs(dst_dir)
     dst = os.path.join(dst_dir, os.path.basename(wotmod_path))
     shutil.copyfile(wotmod_path, dst)
     print('installed -> %s' % dst)
 
 
 def main():
-    ap = argparse.ArgumentParser()
+    ap = argparse.ArgumentParser(description='Build a .wotmod from mod.json + src/.')
     ap.add_argument('--install', action='store_true',
                     help="copy the built .wotmod into the game's mods/<version> folder")
     args = ap.parse_args()
 
+    mod = load_mod()
+    local = load_local()
+    entry, package = discover()
+    run_prebuild(mod['prebuild'])
     compile_pyc()
-    wotmod = build_wotmod()
+    wotmod = build_wotmod(mod, entry, package)
     if args.install:
-        install_wotmod(wotmod)
+        install_wotmod(wotmod, local)
     print('done.')
 
 

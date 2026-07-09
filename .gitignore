@@ -1,4 +1,4 @@
-.work/
 build/
 dist/
 *.pyc
+build.local.json

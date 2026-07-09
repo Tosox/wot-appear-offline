@@ -1,17 +1,3 @@
-# -*- coding: utf-8 -*-
-"""Native Contacts > Settings UI injection for the Appear Offline mod.
-
-We load a small "hook" SWF (appear_offline_contacts_hook.swf) as a lobby view.
-Once loaded it watches for the native Contacts settings view (alias
-'ContactsSettingsView') and injects two CheckBoxes into it. The SWF calls back
-into the DAAPI view class below to read/write our settings.
-
-HOOK_LINKAGE must match the SWF's exported document-class name
-(AppearOfflineHookUI, compiled by src_flash/build_swf.sh).
-
-Toggling saves the choice and notifies the user; the change takes effect on the
-next login (see presence.py for why mid-session changes are avoided).
-"""
 from appear_offline import config
 from appear_offline import translations
 from appear_offline.log import log
@@ -20,41 +6,42 @@ HOOK_LINKAGE = 'AppearOfflineHookUI'
 HOOK_SWF = 'appear_offline_contacts_hook.swf'
 
 _ui_registered = False
-_hook_view = None   # live instance of our loaded hook View (to call into its SWF)
+_hook_view = None
 _cs_orig_populate = None
 
 
-def _format_notify_text():
-    """Compose the notification the game's native way: an alert icon (matching
-    the checkbox's warning icon) + a bold title line + a subtle grey body line.
-    Falls back to plain text if the formatters can't be imported."""
+def _wrap_notify(body):
     title = translations.label('notify_title')
-    body = translations.label('notify_body')
     try:
         from gui.shared.formatters import text_styles
-        return (text_styles.middleTitle(title) + '\n' + text_styles.main(body))
+        return text_styles.middleTitle(title) + '\n' + text_styles.main(body)
     except Exception:
         return title + ': ' + body
 
 
 def notify_apply_on_login():
-    """Tell the user the change takes effect on next login (mid-session changing
-    of chat presence is not reliable on WG's server)."""
     try:
         import gui.SystemMessages as SystemMessages
-        SystemMessages.pushMessage(_format_notify_text(),
+        SystemMessages.pushMessage(_wrap_notify(translations.label('notify_reconnect_body')),
                                    type=SystemMessages.SM_TYPE.Warning)
     except Exception as e:
         log('notify failed: ' + str(e))
 
 
+def notify_current_status():
+    try:
+        import gui.SystemMessages as SystemMessages
+        if config.settings.get('enabled', True):
+            str_id = 'notify_current_status_offline'
+        else:
+            str_id = 'notify_current_status_online'
+        SystemMessages.pushMessage(_wrap_notify(translations.label(str_id)),
+                                   type=SystemMessages.SM_TYPE.Warning)
+    except Exception as e:
+        log('status notify failed: ' + str(e))
+
+
 def reconfigure(enabled, see_others):
-    """From the in-game UI: save the choice and notify the user it applies on
-    next login. We do NOT touch live presence: mid-session changing is unreliable
-    on WG's server (global presence is rate-limited, directed presence isn't
-    delivered to roster friends live, and an in-session reconnect corrupts native
-    handler state). The already-installed patch reads config live, so a fresh
-    login applies it cleanly."""
     config.save(enabled, see_others)
     notify_apply_on_login()
     log('reconfigured: enabled=%s see_others=%s (applies on next login)'
@@ -95,6 +82,7 @@ def register_ui():
     if _ui_registered:
         _load_hook_view()
         return
+
     try:
         from gui.Scaleform.framework import g_entitiesFactories, ViewSettings, ScopeTemplates
         from gui.Scaleform.framework.entities.View import View
@@ -103,8 +91,6 @@ def register_ui():
         from frameworks.wulf import WindowLayer
 
         class _AppearOfflineHookView(View):
-            # Methods below are bound by the DAAPI bridge to the same-named
-            # public Function vars on the Flash side.
 
             def getAppearOfflineSettings(self):
                 return {
@@ -116,11 +102,10 @@ def register_ui():
                 }
 
             def setAppearOfflineSettings(self, enabled, seeOthers):
-                # Saves the choice + notifies; takes effect on next login.
                 reconfigure(enabled, seeOthers)
 
             def pyLog(self, msg):
-                pass   # AS3 debug hook; silent in release builds
+                pass
 
             def _populate(self):
                 global _hook_view
@@ -159,10 +144,6 @@ def unregister_ui():
         pass
 
 
-# --- trigger the SWF injection when the native Contacts settings view opens ---
-# That view is a sub-view that doesn't fire VIEW_LOADED on the main loader, so we
-# patch its _populate to tell our hook SWF to inject the two checkboxes.
-
 def install_contacts_settings_probe():
     global _cs_orig_populate
     try:
@@ -180,7 +161,6 @@ def install_contacts_settings_probe():
 
 
 def _trigger_contacts_injection():
-    """Ask our loaded hook SWF to find the contacts settings view and inject."""
     try:
         if _hook_view is not None and getattr(_hook_view, 'flashObject', None) is not None:
             _hook_view.flashObject.injectContacts()
