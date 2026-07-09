@@ -5,9 +5,9 @@ class AppearOfflineMod(object):
 
     def init(self):
         try:
-            from appear_offline import config, presence, ui
+            from appear_offline import config, patch, ui
             config.load()
-            presence.apply_patch()
+            patch.apply_patch()
             ui.register_ui()
             ui.install_contacts_settings_probe()
             log('loaded')
@@ -17,9 +17,10 @@ class AppearOfflineMod(object):
 
     def fini(self):
         try:
-            from appear_offline import presence, ui
-            presence.remove_patch()
+            from appear_offline import patch, ui
+            ui.remove_contacts_settings_probe()
             ui.unregister_ui()
+            patch.remove_patch()
             log('unloaded')
         except Exception:
             import traceback
