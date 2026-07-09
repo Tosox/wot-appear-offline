@@ -53,9 +53,7 @@ LABELS = {
 
 
 def label(key):
-    try:
-        from helpers import getClientLanguage
-        lang = getClientLanguage()
-    except Exception:
-        lang = 'en'
+    from helpers import getClientLanguage
+
+    lang = getClientLanguage()
     return LABELS.get(lang, LABELS['en']).get(key, key)
