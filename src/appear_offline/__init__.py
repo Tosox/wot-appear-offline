@@ -18,8 +18,9 @@ class AppearOfflineMod(object):
     def fini(self):
         try:
             from appear_offline import patch, ui
-            patch.remove_patch()
+            ui.remove_contacts_settings_probe()
             ui.unregister_ui()
+            patch.remove_patch()
             log('unloaded')
         except Exception:
             import traceback

@@ -19,18 +19,9 @@ def _push_notify(body):
     SystemMessages.pushMessage(message, type=SystemMessages.SM_TYPE.Warning)
 
 
-def notify_current_status():
-    key = 'notify_current_status_offline' if config.settings['enabled'] else 'notify_current_status_online'
-    _push_notify(translations.label(key))
-
-
-def reconfigure(enabled, see_others):
-    try:
-        config.save(enabled, see_others)
-        _push_notify(translations.label('notify_reconnect_body'))
-    except Exception:
-        import traceback
-        log('reconfigure failed:\n' + traceback.format_exc())
+def _reconfigure(enabled, see_others):
+    config.save(enabled, see_others)
+    _push_notify(translations.label('notify_reconnect_body'))
 
 
 def _load_hook_view():
@@ -58,10 +49,49 @@ def _onAppInitialized(event):
         log('hook view load failed:\n' + traceback.format_exc())
 
 
+def _trigger_contacts_injection():
+    try:
+        if _hook_view and _hook_view.flashObject:
+            _hook_view.flashObject.injectContacts()
+    except Exception:
+        import traceback
+        log('contacts injection failed:\n' + traceback.format_exc())
+
+
+def notify_current_status():
+    key = 'notify_current_status_offline' if config.settings['enabled'] else 'notify_current_status_online'
+    _push_notify(translations.label(key))
+
+
+def install_contacts_settings_probe():
+    global _cs_orig_populate
+
+    from messenger.gui.Scaleform.view.lobby.ContactsSettingsView import ContactsSettingsView
+    if _cs_orig_populate is None:
+        _cs_orig_populate = ContactsSettingsView._populate
+
+    # Whenever the real settings panel populates, inject our two checkboxes
+    def _probe(self):
+        _cs_orig_populate(self)
+        _trigger_contacts_injection()
+
+    ContactsSettingsView._populate = _probe
+
+
+def remove_contacts_settings_probe():
+    global _cs_orig_populate
+    if _cs_orig_populate is None:
+        return
+
+    from messenger.gui.Scaleform.view.lobby.ContactsSettingsView import ContactsSettingsView
+    ContactsSettingsView._populate = _cs_orig_populate
+    _cs_orig_populate = None
+
+
 def register_ui():
     global _ui_registered
 
-    # Re-entry after a previous load - just make sure the view is up
+    # Re-entry after a previous load
     if _ui_registered:
         _load_hook_view()
         return
@@ -75,16 +105,32 @@ def register_ui():
     class _AppearOfflineHookView(View):
 
         def getAppearOfflineSettings(self):
-            return {
-                'enabled': config.settings['enabled'],
-                'seeOthers': config.settings['see_others_status'],
-                'labelEnabled': translations.label('enabled'),
-                'labelSeeOthers': translations.label('see_others'),
-                'seeOthersTooltip': translations.label('see_others_tooltip'),
-            }
+            try:
+                return {
+                    'enabled': config.settings['enabled'],
+                    'seeOthers': config.settings['see_others_status'],
+                    'labelEnabled': translations.label('enabled'),
+                    'labelSeeOthers': translations.label('see_others'),
+                    'seeOthersTooltip': translations.label('see_others_tooltip'),
+                }
+            except Exception:
+                import traceback
+                log('settings read failed:\n' + traceback.format_exc())
+                en = translations.LABELS['en']
+                return {
+                    'enabled': config.settings['enabled'],
+                    'seeOthers': config.settings['see_others_status'],
+                    'labelEnabled': en['enabled'],
+                    'labelSeeOthers': en['see_others'],
+                    'seeOthersTooltip': en['see_others_tooltip'],
+                }
 
         def setAppearOfflineSettings(self, enabled, seeOthers):
-            reconfigure(enabled, seeOthers)
+            try:
+                _reconfigure(enabled, seeOthers)
+            except Exception:
+                import traceback
+                log('reconfigure failed:\n' + traceback.format_exc())
 
         def pyLog(self, msg):
             pass
@@ -104,7 +150,7 @@ def register_ui():
             if self._isDAAPIInited():
                 return False
 
-    # Register the hidden hook view and (re)load it whenever the lobby comes up
+    # Register the hidden hook view and load it whenever the lobby comes up
     g_entitiesFactories.addSettings(ViewSettings(
         HOOK_LINKAGE, _AppearOfflineHookView, HOOK_SWF,
         WindowLayer.WINDOW, None, ScopeTemplates.GLOBAL_SCOPE))
@@ -116,32 +162,15 @@ def register_ui():
 
 
 def unregister_ui():
+    global _ui_registered
+    if not _ui_registered:
+        return
+
+    from gui.Scaleform.framework import g_entitiesFactories
     from gui.shared import g_eventBus, EVENT_BUS_SCOPE
     from gui.shared.events import AppLifeCycleEvent
 
     g_eventBus.removeListener(AppLifeCycleEvent.INITIALIZED,
                               _onAppInitialized, scope=EVENT_BUS_SCOPE.GLOBAL)
-
-
-def install_contacts_settings_probe():
-    global _cs_orig_populate
-
-    from messenger.gui.Scaleform.view.lobby.ContactsSettingsView import ContactsSettingsView
-    if _cs_orig_populate is None:
-        _cs_orig_populate = ContactsSettingsView._populate
-
-    # Whenever the real settings panel populates, inject our two checkboxes
-    def _probe(self):
-        _cs_orig_populate(self)
-        _trigger_contacts_injection()
-
-    ContactsSettingsView._populate = _probe
-
-
-def _trigger_contacts_injection():
-    try:
-        if _hook_view is not None and _hook_view.flashObject is not None:
-            _hook_view.flashObject.injectContacts()
-    except Exception:
-        import traceback
-        log('contacts injection failed:\n' + traceback.format_exc())
+    g_entitiesFactories.removeSettings(HOOK_LINKAGE)
+    _ui_registered = False
