@@ -3,55 +3,30 @@ package de.tosox.appear_offline
    import flash.display.MovieClip;
    import flash.display.DisplayObjectContainer;
 
-   import net.wg.data.constants.generated.LAYER_NAMES;
    import net.wg.infrastructure.base.AbstractView;
-   import net.wg.infrastructure.events.LoaderEvent;
 
    import de.tosox.appear_offline.SettingsUI;
 
    public class LobbyHook extends AbstractView
    {
-      public static const CONTACTS_SETTINGS_ALIAS:String = "ContactsSettingsView";
-
+      // Bound by the DAAPI bridge to the Python view methods of the same name
       public var getAppearOfflineSettings:Function;
       public var setAppearOfflineSettings:Function;
 
+      // Remaining frames we are willing to wait for the target panel to build itself
       private var _searchTries:int = 0;
-
-      private function _getContainer(containerName:String) : *
-      {
-         return App.containerMgr.getContainer(LAYER_NAMES.LAYER_ORDER.indexOf(containerName));
-      }
-
-      override protected function onPopulate() : void
-      {
-         super.onPopulate();
-         var viewContainer:* = _getContainer(LAYER_NAMES.VIEWS);
-         if(viewContainer != null)
-         {
-            var num:int = viewContainer.numChildren;
-            for(var idx:int = 0; idx < num; ++idx)
-            {
-               processView(viewContainer.getChildAt(idx));
-            }
-            var topmostView:* = viewContainer.getTopmostView();
-            if(topmostView != null)
-            {
-               viewContainer.setFocusedView(topmostView);
-            }
-         }
-         App.containerMgr.loader.addEventListener(LoaderEvent.VIEW_LOADED, onViewLoaded, false, 0, true);
-      }
 
       override protected function nextFrameAfterPopulateHandler() : void
       {
          super.nextFrameAfterPopulateHandler();
+         // Reparent under the app root so we sit on the stage and can reach every view
          if(parent != App.instance)
          {
             (App.instance as MovieClip).addChild(this);
          }
       }
 
+      // Called from Python the moment ContactsSettingsView populates
       public function injectContacts() : void
       {
          _searchTries = 0;
@@ -64,6 +39,7 @@ package de.tosox.appear_offline
          var found:DisplayObjectContainer = findByChildName(root, "cbIsShowOthers");
          if(found == null)
          {
+            // The panel's children are built over several frames, so the anchor may not exist yet
             _searchTries++;
             if(_searchTries < 12)
             {
@@ -71,6 +47,7 @@ package de.tosox.appear_offline
             }
             return;
          }
+         // Anchor found, its parent is the real settings panel; hand it to SettingsUI
          new SettingsUI(found, getAppearOfflineSettings(), setAppearOfflineSettings);
       }
 
@@ -98,32 +75,6 @@ package de.tosox.appear_offline
             }
          }
          return null;
-      }
-
-      private function onViewLoaded(_event:LoaderEvent) : void
-      {
-         processView(_event.view);
-      }
-
-      private function processView(view:*) : void
-      {
-         if(view == null)
-         {
-            return;
-         }
-         var alias:String = null;
-         try
-         {
-            alias = view.as_config.alias;
-         }
-         catch(e:*)
-         {
-            return;
-         }
-         if(alias == CONTACTS_SETTINGS_ALIAS)
-         {
-            new SettingsUI(view, getAppearOfflineSettings(), setAppearOfflineSettings);
-         }
       }
    }
 }
