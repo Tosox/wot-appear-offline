@@ -41,11 +41,19 @@ You can check out the latest changes in [`CHANGELOG.md`](CHANGELOG.md).
 
 ## 🎥 Preview
 
-| Your view | Their view |
-|:---:|:---:|
-| <img src="readme-res/your-view.png" alt="Your view" width="310"/> | <img src="readme-res/their-view.png" alt="Their view" width="340"/> |
-
-<img src="readme-res/settings.png" alt="Settings" width="310"/>
+<table>
+  <tr>
+    <th align="left">Your view</th>
+    <th align="left">Their view</th>
+  </tr>
+  <tr>
+    <td align="left"><img src="readme-res/your-view.png" alt="Your view" width="310"/></td>
+    <td align="left"><img src="readme-res/their-view.png" alt="Their view" width="340"/></td>
+  </tr>
+  <tr>
+    <td colspan="2" align="left"><img src="readme-res/settings.png" alt="Settings" width="310"/></td>
+  </tr>
+</table>
 
 ## 🛠️ Build from source
 
