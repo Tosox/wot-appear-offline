@@ -11,13 +11,17 @@ package de.tosox.appear_offline
    {
       private static const ENABLED_CB_NAME:String = "appearOfflineEnabledCb";
       private static const SEE_OTHERS_CB_NAME:String = "appearOfflineSeeOthersCb";
+      private static const CLAN_CB_NAME:String = "appearOfflineClanCb";
       private static const SEP_NAME:String = "appearOfflineSeparator";
+
+      private static const MIN_CB_WIDTH:Number = 260;
 
       private var _callback:Function = null;
       private var _settings:Object = null;
       private var _view:DisplayObjectContainer = null;
       private var _cbEnabled:CheckBox = null;
       private var _cbSeeOthers:CheckBox = null;
+      private var _cbClan:CheckBox = null;
 
       public function SettingsUI(view:*, settings:Object, callback:Function)
       {
@@ -73,7 +77,7 @@ package de.tosox.appear_offline
          // Divider between the game's options and ours
          var sep:Sprite = new Sprite();
          sep.name = SEP_NAME;
-         var sepW:Number = (panelW > baseX * 2 + 40) ? (panelW - baseX * 2) : 250;
+         var sepW:Number = (panelW > baseX * 2 + 40) ? (panelW - baseX * 2) : MIN_CB_WIDTH;
          sep.graphics.lineStyle(1, 0xFFFFFF, 0.2);
          sep.graphics.moveTo(0, 0);
          sep.graphics.lineTo(sepW, 0);
@@ -81,42 +85,28 @@ package de.tosox.appear_offline
          sep.y = sepY;
          this._view.addChild(sep);
 
-         // Build both rows with the game's own CLIK CheckBox so they match the UI
-         this._cbEnabled = App.utils.classFactory.getComponent("CheckBox", CheckBox);
-         this._cbEnabled.name = ENABLED_CB_NAME;
-         this._cbEnabled.label = this._settings.labelEnabled;
-         this._cbEnabled.selected = this._settings.enabled;
-         this._cbEnabled.width = 260;
-         this._cbEnabled.x = baseX;
-         this._cbEnabled.y = firstY;
+         // Give the labels the panel's full usable width; some translations are long
+         var cbW:Number = sepW > MIN_CB_WIDTH ? sepW : MIN_CB_WIDTH;
 
-         this._cbSeeOthers = App.utils.classFactory.getComponent("CheckBox", CheckBox);
-         this._cbSeeOthers.name = SEE_OTHERS_CB_NAME;
-         this._cbSeeOthers.label = this._settings.labelSeeOthers;
-         this._cbSeeOthers.selected = this._settings.seeOthers;
+         // Build all three rows with the game's own CLIK CheckBox so they match the UI
+         this._cbEnabled = this.makeCheckBox(ENABLED_CB_NAME, this._settings.labelEnabled, this._settings.enabled, baseX, firstY, cbW);
+         this._cbSeeOthers = this.makeCheckBox(SEE_OTHERS_CB_NAME, this._settings.labelSeeOthers, this._settings.seeOthers, baseX, firstY + rowGap, cbW);
+         this._cbClan = this.makeCheckBox(CLAN_CB_NAME, this._settings.labelVisibleToClan, this._settings.visibleToClan, baseX, firstY + rowGap * 2, cbW);
+
+         // Both sub-options only apply while appear-offline is on
          this._cbSeeOthers.enabled = this._settings.enabled;
-         this._cbSeeOthers.width = 260;
-         this._cbSeeOthers.x = baseX;
-         this._cbSeeOthers.y = firstY + rowGap;
+         this._cbClan.enabled = this._settings.enabled;
 
-         this._cbEnabled.addEventListener(Event.SELECT, this.onChanged);
-         this._cbSeeOthers.addEventListener(Event.SELECT, this.onChanged);
-
-         this._view.addChild(this._cbEnabled);
-         this._view.addChild(this._cbSeeOthers);
-
-         // Warning icon flagging this as the experimental option
-         if(this._settings.seeOthersTooltip != null && String(this._settings.seeOthersTooltip).length > 0)
-         {
-            this._cbSeeOthers.toolTip = this._settings.seeOthersTooltip;
-            this._cbSeeOthers.infoIcoType = "warning";
-         }
+         // Warning icons flagging what each sub-option costs
+         this.applyTooltip(this._cbSeeOthers, this._settings.seeOthersTooltip);
+         this.applyTooltip(this._cbClan, this._settings.visibleToClanTooltip);
 
          this._cbEnabled.validateNow();
          this._cbSeeOthers.validateNow();
+         this._cbClan.validateNow();
 
          // Grow the panel if our rows would spill past its current bottom edge
-         var contentBottom:Number = firstY + rowGap + 18;
+         var contentBottom:Number = firstY + rowGap * 2 + 18;
          var grow:Number = contentBottom - this._view.height;
          if(grow > 0)
          {
@@ -124,13 +114,37 @@ package de.tosox.appear_offline
          }
       }
 
+      private function makeCheckBox(name:String, label:String, selected:Boolean, x:Number, y:Number, width:Number) : CheckBox
+      {
+         var cb:CheckBox = App.utils.classFactory.getComponent("CheckBox", CheckBox);
+         cb.name = name;
+         cb.label = label;
+         cb.selected = selected;
+         cb.width = width;
+         cb.x = x;
+         cb.y = y;
+         cb.addEventListener(Event.SELECT, this.onChanged);
+         this._view.addChild(cb);
+         return cb;
+      }
+
+      private function applyTooltip(cb:CheckBox, tooltip:*) : void
+      {
+         if(tooltip != null && String(tooltip).length > 0)
+         {
+            cb.toolTip = String(tooltip);
+            cb.infoIcoType = "warning";
+         }
+      }
+
       private function onChanged(_event:Event) : void
       {
-         // Keep "See Others" greyed out unless appear-offline is ticked, then notify Python
+         // Keep the sub-options greyed out unless appear-offline is ticked, then notify Python
          this._cbSeeOthers.enabled = this._cbEnabled.selected;
+         this._cbClan.enabled = this._cbEnabled.selected;
          if(this._callback != null)
          {
-            this._callback(this._cbEnabled.selected, this._cbSeeOthers.selected);
+            this._callback(this._cbEnabled.selected, this._cbSeeOthers.selected, this._cbClan.selected);
          }
       }
    }

@@ -9,22 +9,32 @@ Tanks client while you keep playing normally, optionally without losing your
 own view of their online status. Everything is configured from a native panel
 inside the game's Contacts window.
 
-There are two modes:
+For friends there are two modes:
 
-* **Invisible** (*"Still see others' status" on*): you appear offline to everyone,
-  but you still see your friends' and clanmates' live status. *Caveat:* a
-  currently-online contact may see a brief online→offline flicker right after you
-  log in.
-* **Hard offline** (*"Still see others' status" off*): you go fully offline to the
-  server. Simplest and flicker-free, but you also stop seeing others' status.
+* **Invisible** (*"Still see friends' status" on*): you appear offline to them,
+  but you still see their live status. *Caveat:* friends see you briefly come
+  online right after you log in, before you disappear again.
+* **Hard offline** (*"Still see friends' status" off*): you go fully offline to
+  the server. Simplest and flicker-free, but you also stop seeing their status.
+
+Clanmates are hidden by leaving clan chat, so by default you no longer receive
+clan messages and clanmates show as offline to you. Tick **"Still appear online
+to clanmates"** to keep clan chat which makes clanmates and any friend in your
+clan see you as online.
+
+> [!NOTE]
+> Your own row in the clan list and contacts always shows you as online.
+> That's your client's view of itself, not what your clanmates see.
 
 ## 🎮 Usage
 
-Open `Contacts → Settings` in the garage. There you'll find two checkboxes:
+Open `Contacts → Settings` in the garage. There you'll find three checkboxes:
 
-* **Appear offline** — master switch for the mod.
-* **Still see others' status** — picks Invisible (on) vs Hard offline (off). Hover
-  its ⚠ icon for details.
+* **Appear offline** — master switch for the mod, covering friends and clanmates.
+* **Still see friends' status** — picks Invisible (on) vs Hard offline (off) for
+  friends. Hover its ⚠ icon for details.
+* **Still appear online to clanmates** — carves clanmates out of the master
+  switch to keep clan chat. Hover its ⚠ icon for details.
 
 > [!NOTE]
 > A change takes effect on your **next login**, not instantly
@@ -82,25 +92,6 @@ python build.py --install  # also copies it into the game's mods/<version> folde
 ```
 
 The mod is configured through `mod.json`.
-
-## ⚙️ How it works
-
-Your online status is broadcast by your own client over XMPP, through
-`messenger.proto.xmpp.contacts._UserPresence.sendPresence()`. gloox, the native
-XMPP layer, doesn't broadcast on its own, so this one method fully drives it.
-
-The mod installs a single patch over that method once at startup. The patch then
-reads the current config every time the game sends presence, so your setting is
-applied automatically at each login without any mid-session presence spam:
-
-* **Invisible** — broadcast `AVAILABLE` once so the server keeps feeding you
-  contacts' presence, then answer each contact with a directed `UNAVAILABLE` so
-  they see you offline.
-* **Hard offline** — broadcast a global `UNAVAILABLE`.
-
-The native UI is a small Scaleform SWF loaded as a lobby view;
-it injects the two checkboxes into the real `ContactsSettingsView`
-using the game's own CLIK `CheckBox` component.
 
 ## 📄 License
 
