@@ -25,6 +25,12 @@ def _reconfigure(enabled, see_others, visible_to_clan):
     _push_notify(translations.label('notify_reconnect_body'))
 
 
+def _gui_loader():
+    from helpers import dependency
+    from skeletons.gui.impl import IGuiLoader
+    return dependency.instance(IGuiLoader)
+
+
 def _load_hook_view():
     from gui.app_loader.settings import APP_NAME_SPACE
     from gui.shared.personality import ServicesLocator
@@ -34,9 +40,7 @@ def _load_hook_view():
     if not app:
         return
 
-    from helpers import dependency
-    from skeletons.gui.impl import IGuiLoader
-    parent = dependency.instance(IGuiLoader).windowsManager.getMainWindow()
+    parent = _gui_loader().windowsManager.getMainWindow()
     app.loadView(SFViewLoadParams(HOOK_LINKAGE, parent=parent))
 
 
@@ -96,7 +100,7 @@ def register_ui():
         _load_hook_view()
         return
 
-    from gui.Scaleform.framework import g_entitiesFactories, ViewSettings, ScopeTemplates
+    from gui.Scaleform.framework import ViewSettings, ScopeTemplates
     from gui.Scaleform.framework.entities.View import View
     from gui.shared import g_eventBus, EVENT_BUS_SCOPE
     from gui.shared.events import AppLifeCycleEvent
@@ -154,7 +158,7 @@ def register_ui():
                 return False
 
     # Register the hidden hook view and load it whenever the lobby comes up
-    g_entitiesFactories.addSettings(ViewSettings(
+    _gui_loader().entitiesFactory.addSettings(ViewSettings(
         HOOK_LINKAGE, _AppearOfflineHookView, HOOK_SWF,
         WindowLayer.WINDOW, None, ScopeTemplates.GLOBAL_SCOPE))
     g_eventBus.addListener(AppLifeCycleEvent.INITIALIZED,
@@ -169,11 +173,10 @@ def unregister_ui():
     if not _ui_registered:
         return
 
-    from gui.Scaleform.framework import g_entitiesFactories
     from gui.shared import g_eventBus, EVENT_BUS_SCOPE
     from gui.shared.events import AppLifeCycleEvent
 
     g_eventBus.removeListener(AppLifeCycleEvent.INITIALIZED,
                               _onAppInitialized, scope=EVENT_BUS_SCOPE.GLOBAL)
-    g_entitiesFactories.removeSettings(HOOK_LINKAGE)
+    _gui_loader().entitiesFactory.removeSettings(HOOK_LINKAGE)
     _ui_registered = False
